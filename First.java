@@ -1,16 +1,17 @@
 
 import java.io.*; 
 import java.util.*; 
+import java.util.concurrent.*; 
  
-class Merch
+class Merch					//class to handle the merchandise required
 {
 	int stock[];			//	0 - s, 1 - m, 2 - l, 3 - c
 
-	public Merch(){
+	public Merch(){			//constructor, initializes everything to have 20 of each(the initial value)
 		stock = new int[4];
 		stock[0] = 20; stock[1] = 20; stock[2] = 20; stock[3] = 20;
 	}
-	public void printstock()
+	public void printstock()		//print function to display all existing stock
 	{
 		System.out.println("Current stock:");
 		System.out.println("Tshirt - Small = "+stock[0]);
@@ -19,19 +20,21 @@ class Merch
 		System.out.println("Caps = "+stock[3]+"\n");
 	}
 }
-class Order extends Thread
+class Order extends Thread 		//class that handles the orders (note that it is a thread)
 {
 	int id, num, type;
 	Merch m;
+	//Semaphore sem = new Semaphore(1);		//Semaphore to ensure synchronization
 	public Order(int i,int ord, int t, Merch mch){
 		id = i;
 		num = ord;
 		type = t;
 		m = mch;
 	}
-	public void run(){
+	public void run(Semaphore sem){			//override run function, checks if semaphore can be aquired, and if yes does the operation
 		try{
-			synchronized(m){
+			{
+				sem.acquire();
 				if(m.stock[type] < num){
 					System.out.println("Not enough stock available");
 					System.out.println("Order "+id+" FAILED.");
@@ -42,6 +45,7 @@ class Order extends Thread
 					System.out.println("Order "+id+" SUCCESS.");
 				}
 				m.printstock();
+				sem.release();
 			}
 		}
 		catch(Exception e){
@@ -56,6 +60,8 @@ class First{
 		System.out.print("Enter the number of transactions to perform (initial stock 20 each): ");
 		Scanner in = new Scanner(System.in);
 		int x = in.nextInt();
+		Semaphore sem = new Semaphore(1);
+		Order order_list[] = new Order[x];
 		System.out.print("Enter the transactions: ");
 		for(int i=0;i<x;i++){
 			int id,n; char ch;
@@ -63,7 +69,7 @@ class First{
 			ch = in.next().charAt(0);
 			n = in.nextInt();
 			int type = 0;
-			switch(ch){
+			switch(ch){			//handles the different orders that are given
 				case 'S':
 				case 's':
 				type = 0; break;
@@ -77,8 +83,13 @@ class First{
 				case 'c':
 				type = 3; break;
 			}
-			Order o = new Order(id, n, type, m);
-			o.start();
+			Order o = new Order(id, n, type, m);	//orders stored in array and then run to check for concurrency
+			order_list[i] = o;
+			//o.start();			//the running thread need not terminate within the end of this loop instance
 		}
+		for(int i = 0;i<x;i++){
+			order_list[i].run(sem);		//all the orders are run at approximately the same time (though the queue would be maintained )
+		}
+		//synchronization done at the order level, we can also syncronize at other levels (each particular inventory) as well
 	}
 }
